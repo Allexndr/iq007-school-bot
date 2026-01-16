@@ -1,0 +1,12 @@
+{
+    "logins_passwords": [
+        {"login": "sanmemik2000@gmail.com", "password": "dsdsdsd", "issued": false},
+        {"login": "user2", "password": "pass2", "issued": false},
+        {"login": "user3", "password": "pass3", "issued": false},
+        {"login": "user4", "password": "pass3", "issued": false},
+        {"login": "user5", "password": "pass3", "issued": false}
+
+
+    ],
+    "user_requests": {}
+}
