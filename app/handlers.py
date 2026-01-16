@@ -18,7 +18,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("bot.log"),
         logging.StreamHandler()
     ]
 )
@@ -33,6 +32,7 @@ CONTENT_PATH = os.path.join(BASE_DIR, "content")
 APP_PATH = os.path.join(BASE_DIR, "app")
 USERS_PASSWORD_PATH = os.path.join(APP_PATH, "user_passwords.json")
 STUDENT_PASSWORD_PATH = os.path.join(APP_PATH, "student_passwords.json")
+TEMP_PATH = "/tmp"  # Vercel allows writing only to /tmp
 
 # Настройка шрифтов и координат
 try:
@@ -109,7 +109,7 @@ def choose_year_template(year, fio, courses, delete_after_creation=False):
             return None
 
     unique_filename = generate_unique_filename()
-    output_path = os.path.join(CONTENT_PATH, f"{unique_filename}.pdf")
+    output_path = os.path.join(TEMP_PATH, f"{unique_filename}.pdf")
     try:
         image.save(output_path, "PDF", resolution=100.0)
     except Exception as e:
