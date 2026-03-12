@@ -25,14 +25,21 @@ logging.basicConfig(
 router = Router()
 
 # Пути к файлам
-# Пути к файлам
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_PATH = os.path.join(BASE_DIR, "content", "font", "OpenSans_Condensed-Bold.ttf")
 CONTENT_PATH = os.path.join(BASE_DIR, "content")
 APP_PATH = os.path.join(BASE_DIR, "app")
-USERS_PASSWORD_PATH = os.path.join(APP_PATH, "user_passwords.json")
-STUDENT_PASSWORD_PATH = os.path.join(APP_PATH, "student_passwords.json")
 TEMP_PATH = "/tmp"  # Vercel allows writing only to /tmp
+
+# Отдельная директория для изменяемых во время работы файлов (совместима с Vercel)
+RUNTIME_DIR = os.path.join(TEMP_PATH, "iq007bot")
+os.makedirs(RUNTIME_DIR, exist_ok=True)
+
+# Шаблоны (неизменяемые) и рабочие копии JSON
+USERS_PASSWORD_TEMPLATE_PATH = os.path.join(APP_PATH, "user_passwords.json")
+STUDENT_PASSWORD_TEMPLATE_PATH = os.path.join(APP_PATH, "student_passwords.json")
+USERS_PASSWORD_PATH = os.path.join(RUNTIME_DIR, "user_passwords.json")
+STUDENT_PASSWORD_PATH = os.path.join(RUNTIME_DIR, "student_passwords.json")
 
 # Настройка шрифтов и координат
 try:
@@ -129,9 +136,23 @@ def generate_unique_filename():
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     return f"certificate_{timestamp}_{random_string}"
 
-def load_credentials(file_path):
+def load_credentials(file_path, template_path=None):
+    """
+    Загружает учётные данные из изменяемого файла.
+    Если файла ещё нет (например, первый запуск на Vercel),
+    то при наличии template_path создаёт рабочую копию из шаблона.
+    """
     if not os.path.exists(file_path):
-        logging.error(f"Файл {file_path} не найден.")
+        if template_path and os.path.exists(template_path):
+            try:
+                with open(template_path, "r", encoding="utf-8") as src:
+                    data = json.load(src)
+                save_credentials(file_path, data)
+                logging.info(f"Создана рабочая копия файла {file_path} из шаблона {template_path}.")
+                return data
+            except Exception as e:
+                logging.error(f"Не удалось создать рабочую копию {file_path} из {template_path}: {e}")
+        logging.error(f"Файл {file_path} не найден и не удалось использовать шаблон.")
         return {}
     try:
         with open(file_path, "r", encoding="utf-8") as file:
@@ -187,7 +208,7 @@ class AdminStates(StatesGroup):
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    users_credentials = load_credentials(USERS_PASSWORD_PATH)
+    users_credentials = load_credentials(USERS_PASSWORD_PATH, USERS_PASSWORD_TEMPLATE_PATH)
     telegram_id = message.from_user.id  # Используем целое число
 
     # Проверка, связан ли уже Telegram ID с пользователем
@@ -219,7 +240,7 @@ async def process_password(message: Message, state: FSMContext):
     telegram_id = message.from_user.id  # Используем целое число
 
     # Проверка логина и пароля
-    users_credentials = load_credentials(USERS_PASSWORD_PATH)
+    users_credentials = load_credentials(USERS_PASSWORD_PATH, USERS_PASSWORD_TEMPLATE_PATH)
     user_credential = next(
         (cred for cred in users_credentials.get("logins_passwords", [])
          if cred["login"] == login and cred["password"] == password),
@@ -256,7 +277,7 @@ async def process_user_file(message: Message, state: FSMContext):
     document = message.document
     if document.file_name == "user_passwords.json":
         file_info = await message.bot.get_file(document.file_id)
-        file_path = os.path.join(APP_PATH, document.file_name)
+        file_path = USERS_PASSWORD_PATH
         await message.bot.download_file(file_info.file_path, file_path)
         await message.answer("Файл user_passwords.json успешно загружен и перезаписан.")
         logging.info("Файл user_passwords.json был обновлен администратором.")
@@ -279,7 +300,7 @@ async def process_password_file(message: Message, state: FSMContext):
     document = message.document
     if document.file_name == "student_passwords.json":
         file_info = await message.bot.get_file(document.file_id)
-        file_path = os.path.join(APP_PATH, document.file_name)
+        file_path = STUDENT_PASSWORD_PATH
         await message.bot.download_file(file_info.file_path, file_path)
         await message.answer("Файл student_passwords.json успешно загружен и перезаписан.")
         logging.info("Файл student_passwords.json был обновлен администратором.")
@@ -362,8 +383,8 @@ async def get_courses(callback_query: CallbackQuery, state: FSMContext):
 async def get_password(message: Message, state: FSMContext):
     telegram_id = message.from_user.id  # Используем целое число
 
-    users_credentials = load_credentials(USERS_PASSWORD_PATH)
-    student_credentials = load_credentials(STUDENT_PASSWORD_PATH)
+    users_credentials = load_credentials(USERS_PASSWORD_PATH, USERS_PASSWORD_TEMPLATE_PATH)
+    student_credentials = load_credentials(STUDENT_PASSWORD_PATH, STUDENT_PASSWORD_TEMPLATE_PATH)
 
     # Найти пользователя по Telegram ID
     user_credential = next(
@@ -431,7 +452,7 @@ async def reset_passwords(message: Message, state: FSMContext):
         await message.answer("У вас нет прав на выполнение этой команды.")
         return
 
-    users_credentials = load_credentials(USERS_PASSWORD_PATH)
+    users_credentials = load_credentials(USERS_PASSWORD_PATH, USERS_PASSWORD_TEMPLATE_PATH)
 
     # Сбрасываем счетчики и дату сброса для всех пользователей
     for cred in users_credentials.get("logins_passwords", []):

@@ -28,7 +28,7 @@ else:
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
-    status = "running" if bot else "running (token not set)"
+    status = "running" if bot else "running (Bot not set)"
     return f"""
     <html>
         <head>
@@ -44,7 +44,7 @@ async def read_root():
             <div class="container">
                 <h1>IQ007 Bot is {status}</h1>
                 <p>The webhook is active.</p>
-                <p>If you see "token not set", please configure BOT_TOKEN in Vercel settings.</p>
+                <p>If you see "Bot not set", please configure BOT_TOKEN in Vercel settings.</p>
             </div>
         </body>
     </html>
